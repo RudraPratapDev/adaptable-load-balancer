@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Load Balancer Control Center</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            border-radius: 2px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .status-running {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-stopped {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .controls {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border);
+        }
+
+        .control-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: var(--success);
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        select {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .card h3 {
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+
+        .servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .server-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .server-card.healthy {
+            border-left: 4px solid var(--success);
+        }
+
+        .server-card.unhealthy {
+            border-left: 4px solid var(--danger);
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .server-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+        }
+
+        .server-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .server-address {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+
+        .server-status {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .server-status.healthy {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .server-status.unhealthy {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .server-metrics {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle-btn {
+            width: 100%;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+        }
+
+        .test-results {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid var(--border);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.8;
+        }
+
+        .test-results.loading {
+            animation: pulse-bg 1.5s infinite;
+        }
+
+        @keyframes pulse-bg {
+            0%, 100% { background: var(--bg-card); }
+            50% { background: var(--border); }
+        }
+
+        .request-flow {
+            margin-top: 16px;
+        }
+
+        .flow-legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.success {
+            background: var(--success);
+        }
+
+        .legend-dot.failed {
+            background: var(--danger);
+        }
+
+        .request-visualization {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 120px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .request-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid var(--success);
+            animation: slideIn 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .request-item.failed {
+            border-left-color: var(--danger);
+        }
+
+        .request-info {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .request-server {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .request-time {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .request-duration {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .realtime-chart {
+            height: 200px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        /* New styles for per-server distribution */
+        .distribution-bar {
+            display: flex;
+            width: 100%;
+            height: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .distribution-segment {
+            height: 100%;
+        }
+        .server-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .request-item .server-dot { margin-right: 10px; }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .control-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Load Balancer Control Center</h1>
+            <p>Real-time monitoring and intelligent traffic distribution</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <div class="control-group">
+                    <label>Strategy:</label>
+                    <select id="strategy" onchange="changeStrategy()">
+                        <option value="round_robin">Round Robin</option>
+                        <option value="least_connections">Least Connections</option>
+                        <option value="health_score">Health Score Based</option>
+                        <option value="weighted_round_robin">Weighted Round Robin</option>
+                        <option value="response_time">Response Time Based</option>
+                    </select>
+                    <button class="btn" onclick="changeStrategy()">
+                        <span>⚡</span> Update
+                    </button>
+                </div>
+                
+                <div class="control-group">
+                    <button class="btn btn-secondary" onclick="refreshData()">
+                        <span>🔄</span> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="control-row">
+                <div class="control-group">
+                    <button class="btn btn-success" onclick="runLoadTest()">
+                        <span>🚀</span> Load Test (50 req)
+                    </button>
+                    <button class="btn btn-danger" onclick="runStressTest()">
+                        <span>⚡</span> Stress Test (30s)
+                    </button>
+                    <button class="btn" onclick="runCustomTest()">
+                        <span>⚙️</span> Custom Test
+                    </button>
+                    <button id="pauseBtn" class="btn btn-secondary" onclick="toggleLive()">
+                        ⏸️ Pause Live
+                    </button>
+                </div>
+
+                <div id="testResults" class="test-results" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>System Status</h3>
+                <div class="metric">
+                    <span class="metric-label">Status</span>
+                    <span class="metric-value" id="status">
+                        <span class="status-indicator status-running">
+                            <span class="status-dot"></span>
+                            Running
+                        </span>
+                    </span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Strategy</span>
+                    <span class="metric-value" id="currentStrategy">Round Robin</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Healthy Servers</span>
+                    <span class="metric-value" id="healthyServers">0/0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Uptime</span>
+                    <span class="metric-value" id="uptime">0s</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Performance Metrics</h3>
+                <div class="metric">
+                    <span class="metric-label">Total Requests</span>
+                    <span class="metric-value" id="totalRequests">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Active Connections</span>
+                    <span class="metric-value" id="activeConnections">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Peak Connections</span>
+                    <span class="metric-value" id="peakConnections">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Success Rate</span>
+                    <span class="metric-value" id="successRate">100%</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Response & Throughput</h3>
+                <div class="metric">
+                    <span class="metric-label">Avg Response Time</span>
+                    <span class="metric-value" id="avgResponseTime">0ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Throughput</span>
+                    <span class="metric-value" id="throughput">0/min</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Data Transferred</span>
+                    <span class="metric-value" id="dataTransferred">0 KB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Error Count</span>
+                    <span class="metric-value" id="errorCount">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Real-time Request Flow</h3>
+            <div id="requestFlow" class="request-flow">
+                <div class="flow-legend" id="flowLegend">
+                    <span class="legend-item">
+                        <span class="legend-dot success"></span>
+                        Successful Requests
+                    </span>
+                    <span class="legend-item">
+                        <span class="legend-dot failed"></span>
+                        Failed Requests
+                    </span>
+                </div>
+                <div id="distributionContainer" style="margin-bottom: 12px;"></div>
+                <div id="requestVisualization" class="request-visualization">
+                    <!-- Real-time request visualization -->
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Backend Servers</h3>
+            <div id="serversGrid" class="servers-grid">
+                <!-- Server cards populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let servers = [];
+        let isTestRunning = false;
+        let livePaused = false;
+        let dashboardInterval = null;
+        let requestsInterval = null;
+        let lastRenderedLatestTs = 0;
+        // Maintain per-server history of counts to draw sparklines
+        const serverHistory = {}; // serverId -> [counts]
+        // Track a pending strategy change to avoid UI flip during polling
+        let pendingStrategy = null;
+        // Map server identifier to color
+        const serverColors = {};
+        const colorPalette = [
+            '#60a5fa','#34d399','#f472b6','#f59e0b','#22d3ee',
+            '#a78bfa','#f87171','#10b981','#f97316','#2dd4bf'
+        ];
+        function getServerKey(s) { return `${s.host}:${s.port}`; }
+        function colorForServer(serverId) {
+            if (!serverColors[serverId]) {
+                const idx = Object.keys(serverColors).length % colorPalette.length;
+                serverColors[serverId] = colorPalette[idx];
+            }
+            return serverColors[serverId];
+        }
+
+        function startLive() {
+            if (dashboardInterval) clearInterval(dashboardInterval);
+            if (requestsInterval) clearInterval(requestsInterval);
+            dashboardInterval = setInterval(() => { if (!livePaused) updateDashboard(); }, 1000);
+            requestsInterval = setInterval(() => { if (!livePaused) updateRequestVisualization(); }, 1000);
+        }
+
+        function toggleLive() {
+            livePaused = !livePaused;
+            const btn = document.getElementById('pauseBtn');
+            btn.textContent = livePaused ? '▶️ Resume Live' : '⏸️ Pause Live';
+            if (!livePaused) {
+                updateDashboard();
+                updateRequestVisualization();
+            }
+        }
+
+        async function fetchData(endpoint) {
+            try {
+                const response = await fetch(endpoint);
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                return null;
+            }
+        }
+
+        async function postData(endpoint, data) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('Post error:', error);
+                return null;
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function formatUptime(seconds) {
+            if (seconds < 60) return `${Math.round(seconds)}s`;
+            if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+            return `${Math.round(seconds / 3600)}h`;
+        }
+
+        async function updateDashboard() {
+            const data = await fetchData('/api/realtime');
+            
+            if (!data) return;
+
+            const { status, performance, servers: serverData } = data;
+
+            if (status) {
+                const statusEl = document.getElementById('status');
+                statusEl.innerHTML = status.running 
+                    ? '<span class="status-indicator status-running"><span class="status-dot"></span>Running</span>'
+                    : '<span class="status-indicator status-stopped"><span class="status-dot"></span>Stopped</span>';
+
+                // Update strategy UI unless a change is pending
+                if (pendingStrategy === null || status.strategy === pendingStrategy) {
+                    const strategyNames = {
+                        'round_robin': 'Round Robin',
+                        'least_connections': 'Least Connections', 
+                        'health_score': 'Health Score Based',
+                        'weighted_round_robin': 'Weighted Round Robin',
+                        'response_time': 'Response Time Based'
+                    };
+                    document.getElementById('currentStrategy').textContent = 
+                        strategyNames[status.strategy] || status.strategy;
+                    document.getElementById('strategy').value = status.strategy;
+                    if (pendingStrategy === status.strategy) pendingStrategy = null;
+                }
+
+                document.getElementById('healthyServers').textContent = 
+                    `${status.healthy_servers}/${status.total_servers}`;
+            }
+
+            if (performance) {
+                document.getElementById('totalRequests').textContent = performance.total_requests || 0;
+                document.getElementById('activeConnections').textContent = performance.active_connections || 0;
+                document.getElementById('peakConnections').textContent = performance.peak_connections || 0;
+                document.getElementById('avgResponseTime').textContent = `${performance.avg_response_time_ms || 0}ms`;
+                document.getElementById('throughput').textContent = `${performance.throughput_per_minute || 0}/min`;
+                document.getElementById('dataTransferred').textContent = formatBytes(performance.total_bytes_transferred || 0);
+                document.getElementById('errorCount').textContent = performance.error_count || 0;
+                document.getElementById('successRate').textContent = `${performance.success_rate || 100}%`;
+                document.getElementById('uptime').textContent = formatUptime(performance.uptime_seconds || 0);
+
+                // Update distribution bar when counts are available
+                renderDistribution(performance.server_request_counts || {});
+
+                // Update per-server history for sparklines
+                const counts = performance.server_request_counts || {};
+                Object.keys(counts).forEach(id => {
+                    if (!serverHistory[id]) serverHistory[id] = [];
+                    serverHistory[id].push(counts[id]);
+                    if (serverHistory[id].length > 30) serverHistory[id].shift();
+                });
+            }
+
+            if (serverData) {
+                servers = serverData;
+                updateServersGrid();
+                renderLegend();
+            }
+        }
+
+        async function updateServersGrid() {
+            const grid = document.getElementById('serversGrid');
+            grid.innerHTML = '';
+
+            // Get algorithm-specific metrics
+            const algorithmData = await fetchData('/api/algorithm-metrics');
+            const algorithmMetrics = {};
+            if (algorithmData && algorithmData.servers) {
+                algorithmData.servers.forEach(srv => {
+                    const key = `${srv.host}:${srv.port}`;
+                    algorithmMetrics[key] = srv;
+                });
+            }
+
+            servers.forEach(server => {
+                const key = getServerKey(server);
+                const color = colorForServer(key);
+                const card = document.createElement('div');
+                card.className = `server-card ${server.healthy ? 'healthy' : 'unhealthy'}`;
+
+                const requestCounts = (window.lastServerCounts || {});
+                const count = requestCounts[key] || 0;
+
+                const history = serverHistory[key] || [];
+                const spark = renderSparkline(history, color);
+
+                // Get algorithm-specific metrics for this server
+                const algMetrics = algorithmMetrics[key] || {};
+                let algorithmInfo = '';
+                
+                if (algMetrics.health_score !== undefined) {
+                    algorithmInfo = `<span>Health Score: ${algMetrics.health_score}</span>`;
+                } else if (algMetrics.weight !== undefined) {
+                    algorithmInfo = `<span>Weight: ${algMetrics.weight}</span>`;
+                } else if (algMetrics.avg_response_time !== undefined) {
+                    algorithmInfo = `<span>Avg Response: ${algMetrics.avg_response_time}ms</span>`;
+                }
+
+                card.innerHTML = `
+                    <div class="server-header">
+                        <div class="server-address"><span class="server-dot" style="background:${color}"></span>${server.host}:${server.port}</div>
+                        <div class="server-status ${server.healthy ? 'healthy' : 'unhealthy'}">
+                            ${server.healthy ? 'Healthy' : 'Unhealthy'}
+                        </div>
+                    </div>
+                    <div class="server-metrics">
+                        <span>Connections: ${server.connections}</span>
+                        <span>Failures: ${server.failures || 0}</span>
+                        ${algorithmInfo}
+                    </div>
+                    <div class="progress-bar" title="Requests served">
+                        <div class="progress-fill" style="width:${count}%"></div>
+                    </div>
+                    <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px;">Requests served: <strong>${count}</strong></div>
+                    <div class="realtime-chart" style="height:60px;display:block;align-items:stretch;justify-content:stretch;">
+                        ${spark}
+                    </div>
+                    <button class="toggle-btn btn ${server.healthy ? 'btn-danger' : 'btn-success'}" 
+                            onclick="toggleServer('${server.host}', ${server.port})">
+                        ${server.healthy ? '⏹️ Stop Server' : '▶️ Start Server'}
+                    </button>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        function renderLegend() {
+            const legend = document.getElementById('flowLegend');
+            // Keep the first two default items, then add per-server
+            legend.innerHTML = `
+                <span class="legend-item">
+                    <span class="legend-dot success"></span>
+                    Successful Requests
+                </span>
+                <span class="legend-item">
+                    <span class="legend-dot failed"></span>
+                    Failed Requests
+                </span>
+            ` + servers.map(s => {
+                const key = getServerKey(s);
+                const color = colorForServer(key);
+                return `<span class=\"legend-item\"><span class=\"server-dot\" style=\"background:${color}\"></span>${key}</span>`;
+            }).join(' ');
+        }
+
+        function renderDistribution(serverCounts) {
+            window.lastServerCounts = serverCounts;
+            const container = document.getElementById('distributionContainer');
+            const total = Object.values(serverCounts).reduce((a,b)=>a+b,0) || 1;
+            const bar = document.createElement('div');
+            bar.className = 'distribution-bar';
+            bar.innerHTML = Object.entries(serverCounts).map(([serverId, count]) => {
+                const pct = Math.round((count / total) * 100);
+                const color = colorForServer(serverId);
+                return `<div class=\"distribution-segment\" style=\"width:${pct}%;background:${color}\" title=\"${serverId}: ${count} (${pct}%)\"></div>`;
+            }).join('');
+            container.innerHTML = '<div style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:6px;">Request distribution</div>';
+            container.appendChild(bar);
+        }
+
+        function renderSparkline(values, color) {
+            if (!values || values.length === 0) return '<div style="color:var(--text-secondary);font-size:0.8rem;">No data</div>';
+            const width = 240, height = 50, pad = 4;
+            const min = Math.min(...values), max = Math.max(...values);
+            const span = Math.max(1, max - min);
+            const stepX = (width - pad*2) / Math.max(1, (values.length - 1));
+            const points = values.map((v, i) => {
+                const x = pad + i * stepX;
+                const y = pad + (height - pad*2) * (1 - (v - min) / span);
+                return `${x},${y}`;
+            }).join(' ');
+            return `<svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" />
+                    </svg>`;
+        }
+
+        async function toggleServer(host, port) {
+            const result = await postData('/api/servers/toggle', { host, port });
+            if (result && result.success) {
+                await updateDashboard();
+            }
+        }
+
+        async function changeStrategy() {
+            const strategy = document.getElementById('strategy').value;
+            // Mark as pending to prevent polling from overriding selection
+            pendingStrategy = strategy;
+            // Optimistically update label
+            const strategyNames = {
+                'round_robin': 'Round Robin',
+                'least_connections': 'Least Connections', 
+                'health_score': 'Health Score Based',
+                'weighted_round_robin': 'Weighted Round Robin',
+                'response_time': 'Response Time Based'
+            };
+            document.getElementById('currentStrategy').textContent = 
+                strategyNames[strategy] || strategy;
+            const result = await postData('/api/strategy', { strategy });
+            if (result && result.success) {
+                await updateDashboard();
+            }
+        }
+
+        async function runLoadTest() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '🚀 Running load test with 50 requests...';
+            resultsDiv.classList.add('loading');
+
+            const result = await postData('/api/load-test', { requests: 50, concurrent: 10 });
+
+            resultsDiv.classList.remove('loading');
+            isTestRunning = false;
+
+            if (result) {
+                const dist = await fetchData('/api/realtime');
+                const counts = (dist && dist.performance && dist.performance.server_request_counts) || {};
+                const total = Object.values(counts).reduce((a,b)=>a+b,0);
+                const summary = Object.entries(counts).map(([id,c]) => `${id}: ${c}`).join(', ');
+                resultsDiv.innerHTML = `
+                    <strong>Load Test Results:</strong><br>
+                    📊 Total Requests: ${result.total_requests}<br>
+                    ✅ Successful: ${result.successful}<br>
+                    ❌ Failed: ${result.failed}<br>
+                    ⏱️ Avg Response: ${result.avg_response_time}ms<br>
+                    📈 Min/Max: ${result.min_response_time}ms / ${result.max_response_time}ms<br>
+                    🔥 RPS: ${result.requests_per_second}<br>
+                    ⏰ Duration: ${result.duration}s<br>
+                    <hr style="border-color:var(--border);margin:8px 0;">
+                    🧭 Distribution (since start): ${total} total — ${summary}
+                `;
+            } else {
+                resultsDiv.innerHTML = '❌ Load test failed';
+            }
+
+            await updateDashboard();
+        }
+
+        async function runStressTest() {
+            if (isTestRunning) return;
+            
+            isTestRunning = true;
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '⚡ Running stress test for 30 seconds...';
+            resultsDiv.classList.add('loading');
+
+            const result = await postData('/api/stress-test', { duration: 30, concurrent: 50 });
+
+            resultsDiv.classList.remove('loading');
+            isTestRunning = false;
+
+            if (result) {
+                const dist = await fetchData('/api/realtime');
+                const counts = (dist && dist.performance && dist.performance.server_request_counts) || {};
+                const total = Object.values(counts).reduce((a,b)=>a+b,0);
+                const summary = Object.entries(counts).map(([id,c]) => `${id}: ${c}`).join(', ');
+                resultsDiv.innerHTML = `
+                    <strong>Stress Test Results:</strong><br>
+                    ⚡ Duration: ${result.duration}s<br>
+                    👥 Concurrent Users: ${result.concurrent_users}<br>
+                    📊 Total Requests: ${result.total_requests}<br>
+                    ✅ Successful: ${result.successful}<br>
+                    ❌ Failed: ${result.failed}<br>
+                    📈 Success Rate: ${result.success_rate}%<br>
+                    ⏱️ Avg Response: ${result.avg_response_time}ms<br>
+                    🔥 RPS: ${result.requests_per_second}<br>
+                    <hr style="border-color:var(--border);margin:8px 0;">
+                    🧭 Distribution (since start): ${total} total — ${summary}
+                `;
+            } else {
+                resultsDiv.innerHTML = '❌ Stress test failed';
+            }
+
+            await updateDashboard();
+        }
+
+        async function runCustomTest() {
+            if (isTestRunning) return;
+            
+            const requests = prompt('Number of requests:', '100');
+            const concurrent = prompt('Concurrent connections:', '20');
+            
+            if (!requests || !concurrent) return;
+            
+            isTestRunning = true;
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = `⚙️ Running custom test: ${requests} requests, ${concurrent} concurrent...`;
+            resultsDiv.classList.add('loading');
+
+            const result = await postData('/api/load-test', { 
+                requests: parseInt(requests), 
+                concurrent: parseInt(concurrent) 
+            });
+
+            resultsDiv.classList.remove('loading');
+            isTestRunning = false;
+
+            if (result) {
+                resultsDiv.innerHTML = `
+                    <strong>Custom Test Results:</strong><br>
+                    📊 Total Requests: ${result.total_requests}<br>
+                    ✅ Successful: ${result.successful}<br>
+                    ❌ Failed: ${result.failed}<br>
+                    ⏱️ Avg Response: ${result.avg_response_time}ms<br>
+                    📈 Min/Max: ${result.min_response_time}ms / ${result.max_response_time}ms<br>
+                    🔥 RPS: ${result.requests_per_second}<br>
+                    ⏰ Duration: ${result.duration}s
+                `;
+            } else {
+                resultsDiv.innerHTML = '❌ Custom test failed';
+            }
+
+            await updateDashboard();
+        }
+
+        function refreshData() {
+            updateDashboard();
+        }
+
+        async function updateRequestVisualization() {
+            const data = await fetchData('/api/requests');
+            if (!data) return;
+
+            const visualization = document.getElementById('requestVisualization');
+            const recentRequests = data.recent_requests || [];
+
+            // Skip re-render if no new requests since last draw
+            const latestTs = recentRequests.length ? recentRequests[recentRequests.length - 1].timestamp : 0;
+            if (latestTs === lastRenderedLatestTs) return;
+            lastRenderedLatestTs = latestTs;
+
+            // Clear old requests
+            visualization.innerHTML = '';
+
+            if (recentRequests.length === 0) {
+                visualization.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">No recent requests</div>';
+                return;
+            }
+
+            // Show recent requests (newest first)
+            recentRequests.reverse().forEach(request => {
+                const requestEl = document.createElement('div');
+                requestEl.className = `request-item ${request.success ? 'success' : 'failed'}`;
+                const color = request.server ? colorForServer(request.server) : 'var(--primary)';
+                const time = new Date(request.timestamp * 1000).toLocaleTimeString();
+                const duration = Math.round(request.duration * 1000);
+
+                requestEl.innerHTML = `
+                    <div class="request-info">
+                        <span class="server-dot" style="background:${color}"></span>
+                        <span class="request-server">${request.server || 'Unknown'}</span>
+                        <span class="request-time">${time}</span>
+                    </div>
+                    <div class="request-duration">${duration}ms</div>
+                `;
+                visualization.appendChild(requestEl);
+            });
+        }
+
+        // Auto-refresh every 1 second for real-time feel
+        startLive();
+
+        // Initial load
+        updateDashboard();
+        updateRequestVisualization();
+    </script>
+</body>
+</html>
