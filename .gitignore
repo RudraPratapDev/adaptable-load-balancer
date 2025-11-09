@@ -217,3 +217,81 @@ temp/
 server_logs/
 metrics/
 performance_data/
+
+# Documentation backups (keep only the main versions)
+README_OLD.md
+*_BACKUP.md
+*_OLD.md
+
+# Test output files
+test_results/
+test_output/
+*.test.log
+
+# Algorithm-specific data files
+algorithm_metrics/
+cache_data/
+latency_data/
+
+# Python virtual environments (additional patterns)
+.Python
+pyvenv.cfg
+pip-selfcheck.json
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+
+# mypy type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+pytest_cache/
+
+# Profiling data
+*.prof
+*.lprof
+profile_stats/
+
+# Database files (if any)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variable files
+.env.local
+.env.*.local
+
+# Editor backup files
+*~
+*.swp
+*.swo
+.*.swp
+.*.swo
+
+# Windows specific
+desktop.ini
+$RECYCLE.BIN/
+
+# macOS specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux specific
+.directory
+.Trash-*
+
+# Project-specific runtime files
+*.pid.lock
+*.sock.lock

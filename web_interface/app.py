@@ -52,7 +52,7 @@ class WebAppHandler(BaseHTTPRequestHandler):
             self.send_error(404)
     
     def serve_dashboard(self):
-        with open(os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html'), 'r') as f:
+        with open(os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html'), 'r', encoding='utf-8') as f:
             html = f.read()
         
         self.send_response(200)
@@ -168,7 +168,33 @@ class WebAppHandler(BaseHTTPRequestHandler):
                 avg_response_time = self.lb.pool.get_average_response_time(srv['host'], srv['port'])
                 server_metrics['avg_response_time'] = round(avg_response_time * 1000, 2)  # Convert to ms
             
+            # Add tail-risk metrics for ALPHA1
+            elif strategy_name == 'alpha1':
+                from load_balancer.strategies import ALPHA1Strategy
+                if isinstance(self.lb.strategy, ALPHA1Strategy):
+                    alpha1_metrics = self.lb.strategy.get_server_metrics(srv['host'], srv['port'])
+                    server_metrics.update(alpha1_metrics)
+            
+            # Add cache-aware metrics for BETA1
+            elif strategy_name == 'beta1':
+                from load_balancer.strategies import BETA1Strategy
+                if isinstance(self.lb.strategy, BETA1Strategy):
+                    beta1_metrics = self.lb.strategy.get_server_metrics(srv['host'], srv['port'])
+                    server_metrics.update(beta1_metrics)
+            
             metrics['servers'].append(server_metrics)
+        
+        # Add global ALPHA1 metrics if applicable
+        if strategy_name == 'alpha1':
+            from load_balancer.strategies import ALPHA1Strategy
+            if isinstance(self.lb.strategy, ALPHA1Strategy):
+                metrics['alpha1_global'] = self.lb.strategy.get_metrics()
+        
+        # Add global BETA1 metrics if applicable
+        if strategy_name == 'beta1':
+            from load_balancer.strategies import BETA1Strategy
+            if isinstance(self.lb.strategy, BETA1Strategy):
+                metrics['beta1_global'] = self.lb.strategy.get_metrics()
         
         self.send_json_response(metrics)
     
@@ -202,7 +228,7 @@ class WebAppHandler(BaseHTTPRequestHandler):
         data = json.loads(post_data.decode('utf-8'))
         
         strategy = data.get('strategy')
-        valid_strategies = ['round_robin', 'least_connections', 'health_score', 'weighted_round_robin', 'response_time']
+        valid_strategies = ['round_robin', 'least_connections', 'health_score', 'weighted_round_robin', 'response_time', 'alpha1', 'beta1']
         
         if self.lb and strategy in valid_strategies:
             self.lb.config['strategy'] = strategy
@@ -220,6 +246,12 @@ class WebAppHandler(BaseHTTPRequestHandler):
             elif strategy == 'response_time':
                 from load_balancer.strategies import ResponseTimeBasedStrategy
                 self.lb.strategy = ResponseTimeBasedStrategy()
+            elif strategy == 'alpha1':
+                from load_balancer.strategies import ALPHA1Strategy
+                self.lb.strategy = ALPHA1Strategy()
+            elif strategy == 'beta1':
+                from load_balancer.strategies import BETA1Strategy
+                self.lb.strategy = BETA1Strategy()
             else:
                 from load_balancer.strategies import RoundRobinStrategy
                 self.lb.strategy = RoundRobinStrategy()

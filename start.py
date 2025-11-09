@@ -13,14 +13,14 @@ class LoadBalancerDemo:
         self.running = True
     
     def start_backend_server(self, port, name):
-        cmd = ['python3', 'backend_server.py', str(port), name]
+        cmd = ['python', 'backend_server.py', str(port), name]
         proc = subprocess.Popen(cmd)
         self.processes.append(proc)
         print(f"Started {name} on port {port}")
         return proc
     
     def start_load_balancer(self):
-        cmd = ['python3', 'run.py']
+        cmd = ['python', 'run.py']
         proc = subprocess.Popen(cmd)
         self.processes.append(proc)
         print("Started load balancer with web interface")

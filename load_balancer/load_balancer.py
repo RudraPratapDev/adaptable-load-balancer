@@ -7,7 +7,7 @@ from datetime import datetime
 from .server_pool import ServerPool
 from .strategies import (RoundRobinStrategy, LeastConnectionsStrategy, 
                         HealthScoreBasedStrategy, HistoricalFailureWeightedRoundRobin,
-                        ResponseTimeBasedStrategy)
+                        ResponseTimeBasedStrategy, ALPHA1Strategy, BETA1Strategy)
 from .health_monitor import HealthMonitor
 from .proxy import NetworkProxy
 
@@ -29,6 +29,10 @@ class LoadBalancer:
             self.strategy = HistoricalFailureWeightedRoundRobin()
         elif strategy_name == 'response_time':
             self.strategy = ResponseTimeBasedStrategy()
+        elif strategy_name == 'alpha1':
+            self.strategy = ALPHA1Strategy()
+        elif strategy_name == 'beta1':
+            self.strategy = BETA1Strategy()
         else:
             self.strategy = RoundRobinStrategy()
         
@@ -152,14 +156,14 @@ class LoadBalancer:
                         self.stats['server_request_counts'][selected_server] = 0
                     self.stats['server_request_counts'][selected_server] += 1
                 
-                # Record response time for ResponseTimeBasedStrategy
+                # Record response time for ResponseTimeBasedStrategy and ALPHA1Strategy
                 if success and selected_server:
                     host, port = selected_server.split(':')
                     response_time = request_end - request_start
                     self.pool.record_response_time(host, int(port), response_time)
                     
-                    # Also record in strategy if it's ResponseTimeBasedStrategy
-                    if isinstance(self.strategy, ResponseTimeBasedStrategy):
+                    # Also record in strategy if it supports response time tracking
+                    if isinstance(self.strategy, (ResponseTimeBasedStrategy, ALPHA1Strategy)):
                         self.strategy.record_response_time(host, int(port), response_time)
             
             try:
