@@ -47,9 +47,12 @@ class LoadBalancer:
             'failed_requests': 0,
             'start_time': datetime.now(),
             'recent_requests': [],  # Track recent requests for visualization
-            'server_request_counts': {}  # Track requests per server
+            'server_request_counts': {},  # Track requests per server
+            'peak_connections': 0  # Track peak connections
         }
         self.stats_lock = threading.Lock()
+        self.stats_cache = None
+        self.stats_cache_time = 0
     
     def add_backend_server(self, host, port):
         self.pool.add_server(host, port)
@@ -96,6 +99,7 @@ class LoadBalancer:
         
         success = False
         selected_server = None
+        max_retries = 3  # Retry with different servers if one fails
         
         try:
             if self.pool.all_servers_down():
@@ -104,32 +108,45 @@ class LoadBalancer:
                     self.stats['failed_requests'] += 1
                 return
             
-            srv = self.get_next_server()
-            if not srv:
-                self.send_error_response(client_sock)
-                with self.stats_lock:
-                    self.stats['failed_requests'] += 1
-                return
-            
-            selected_server = f"{srv['host']}:{srv['port']}"
-            self.pool.increment_connections(srv['host'], srv['port'])
-            
-            try:
-                ok = self.proxy.handle_connection(client_sock, srv['host'], srv['port'])
-                if ok:
-                    success = True
-                    with self.stats_lock:
-                        self.stats['successful_requests'] += 1
-                else:
-                    self.send_error_response(client_sock)
-                    with self.stats_lock:
-                        self.stats['failed_requests'] += 1
-            except Exception as e:
-                print(f"Proxy error: {e}")
-                with self.stats_lock:
-                    self.stats['failed_requests'] += 1
-            finally:
-                self.pool.decrement_connections(srv['host'], srv['port'])
+            # Try multiple servers if needed
+            for attempt in range(max_retries):
+                srv = self.get_next_server()
+                if not srv:
+                    if attempt == max_retries - 1:
+                        self.send_error_response(client_sock)
+                        with self.stats_lock:
+                            self.stats['failed_requests'] += 1
+                    continue
+                
+                selected_server = f"{srv['host']}:{srv['port']}"
+                self.pool.increment_connections(srv['host'], srv['port'])
+                
+                try:
+                    ok = self.proxy.handle_connection(client_sock, srv['host'], srv['port'])
+                    if ok:
+                        success = True
+                        with self.stats_lock:
+                            self.stats['successful_requests'] += 1
+                        break  # Success, exit retry loop
+                    else:
+                        # Connection failed, mark server as potentially unhealthy
+                        self.pool.mark_unhealthy(srv['host'], srv['port'])
+                        if attempt == max_retries - 1:
+                            self.send_error_response(client_sock)
+                            with self.stats_lock:
+                                self.stats['failed_requests'] += 1
+                except Exception as e:
+                    print(f"Proxy error to {selected_server}: {e}")
+                    self.pool.mark_unhealthy(srv['host'], srv['port'])
+                    if attempt == max_retries - 1:
+                        with self.stats_lock:
+                            self.stats['failed_requests'] += 1
+                finally:
+                    self.pool.decrement_connections(srv['host'], srv['port'])
+                
+                # If we failed, try another server
+                if not success and attempt < max_retries - 1:
+                    time.sleep(0.1)  # Brief delay before retry
                 
         finally:
             request_end = time.time()
@@ -210,8 +227,17 @@ class LoadBalancer:
         print("Load balancer stopped")
     
     def get_performance_stats(self):
+        # Cache stats for 1 second to reduce lock contention and computation
+        current_time = time.time()
+        if self.stats_cache and (current_time - self.stats_cache_time) < 1.0:
+            return self.stats_cache
+        
         with self.stats_lock:
             uptime = (datetime.now() - self.stats['start_time']).total_seconds()
+            
+            # Update peak connections
+            if self.stats['active_connections'] > self.stats['peak_connections']:
+                self.stats['peak_connections'] = self.stats['active_connections']
             
             # Calculate success rate
             total = self.stats['successful_requests'] + self.stats['failed_requests']
@@ -221,18 +247,25 @@ class LoadBalancer:
             recent_times = [r['duration'] for r in self.stats['recent_requests'] if r['success']]
             avg_response_time = (sum(recent_times) / len(recent_times)) * 1000 if recent_times else 0
             
-            return {
+            result = {
                 'total_requests': self.stats['total_requests'],
                 'successful_requests': self.stats['successful_requests'],
                 'failed_requests': self.stats['failed_requests'],
                 'active_connections': self.stats['active_connections'],
+                'peak_connections': self.stats['peak_connections'],
                 'uptime_seconds': round(uptime, 1),
                 'success_rate': round(success_rate, 1),
                 'avg_response_time_ms': round(avg_response_time, 2),
-                'requests_per_minute': round((self.stats['total_requests'] / max(uptime/60, 1)), 1),
+                'throughput_per_minute': round((self.stats['total_requests'] / max(uptime/60, 1)), 1),
+                'total_bytes_transferred': self.stats['total_requests'] * 1024,  # Estimate
+                'error_count': self.stats['failed_requests'],
                 'server_request_counts': dict(self.stats['server_request_counts']),
                 'recent_requests': list(self.stats['recent_requests'][-10:])  # Last 10 requests
             }
+            
+            self.stats_cache = result
+            self.stats_cache_time = current_time
+            return result
     
     def get_status(self):
         servers = self.pool.get_all_servers()

@@ -664,6 +664,7 @@
         let dashboardInterval = null;
         let requestsInterval = null;
         let lastRenderedLatestTs = 0;
+        let lastServerState = null; // Track last server state to avoid unnecessary re-renders
         // Maintain per-server history of counts to draw sparklines
         const serverHistory = {}; // serverId -> [counts]
         // Track a pending strategy change to avoid UI flip during polling
@@ -686,8 +687,8 @@
         function startLive() {
             if (dashboardInterval) clearInterval(dashboardInterval);
             if (requestsInterval) clearInterval(requestsInterval);
-            dashboardInterval = setInterval(() => { if (!livePaused) updateDashboard(); }, 1000);
-            requestsInterval = setInterval(() => { if (!livePaused) updateRequestVisualization(); }, 1000);
+            dashboardInterval = setInterval(() => { if (!livePaused) updateDashboard(); }, 2000);
+            requestsInterval = setInterval(() => { if (!livePaused) updateRequestVisualization(); }, 3000);
         }
 
         function toggleLive() {
@@ -794,9 +795,16 @@
             }
 
             if (serverData) {
+                // Always update servers to show real-time changes
                 servers = serverData;
                 updateServersGrid();
-                renderLegend();
+                
+                // Only update legend if server list changed
+                const serverKeys = serverData.map(s => `${s.host}:${s.port}`).sort().join(',');
+                if (serverKeys !== lastServerState) {
+                    lastServerState = serverKeys;
+                    renderLegend();
+                }
             }
         }
 
@@ -1074,19 +1082,22 @@
 
             // Skip re-render if no new requests since last draw
             const latestTs = recentRequests.length ? recentRequests[recentRequests.length - 1].timestamp : 0;
-            if (latestTs === lastRenderedLatestTs) return;
+            if (latestTs === lastRenderedLatestTs && visualization.children.length > 0) return;
             lastRenderedLatestTs = latestTs;
 
             // Clear old requests
             visualization.innerHTML = '';
 
             if (recentRequests.length === 0) {
-                visualization.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">No recent requests</div>';
+                if (visualization.children.length === 0 || visualization.textContent.indexOf('No recent requests') === -1) {
+                    visualization.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">No recent requests</div>';
+                }
                 return;
             }
 
-            // Show recent requests (newest first)
-            recentRequests.reverse().forEach(request => {
+            // Show recent requests (newest first) - limit to last 10 for performance
+            const displayRequests = recentRequests.slice(-10).reverse();
+            displayRequests.forEach(request => {
                 const requestEl = document.createElement('div');
                 requestEl.className = `request-item ${request.success ? 'success' : 'failed'}`;
                 const color = request.server ? colorForServer(request.server) : 'var(--primary)';
@@ -1105,7 +1116,8 @@
             });
         }
 
-        // Auto-refresh every 1 second for real-time feel
+        // Auto-refresh with optimized intervals to reduce flicker
+        // Dashboard: 2s, Requests: 3s (only updates when data changes)
         startLive();
 
         // Initial load

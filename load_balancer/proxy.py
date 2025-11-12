@@ -16,10 +16,23 @@ class NetworkProxy:
     
     def forward_data(self, client_sock, server_sock):
         try:
-            sockets = [client_sock, server_sock]
+            # Set non-blocking mode for better handling
+            client_sock.setblocking(False)
+            server_sock.setblocking(False)
             
-            while True:
-                ready, _, _ = select.select(sockets, [], [], 1.0)
+            sockets = [client_sock, server_sock]
+            client_done = False
+            server_done = False
+            
+            while not (client_done and server_done):
+                # Use longer timeout to avoid premature disconnection
+                ready, _, exceptional = select.select(sockets, [], sockets, 5.0)
+                
+                # Check for exceptional conditions
+                if exceptional:
+                    break
+                
+                # If no sockets ready after timeout, check if both sides are done
                 if not ready:
                     break
                 
@@ -27,16 +40,35 @@ class NetworkProxy:
                     try:
                         data = sock.recv(4096)
                         if not data:
-                            return
+                            # Connection closed
+                            if sock is client_sock:
+                                client_done = True
+                            else:
+                                server_done = True
+                            continue
                             
                         if sock is client_sock:
                             server_sock.sendall(data)
                         else:
                             client_sock.sendall(data)
-                    except:
+                    except socket.error as e:
+                        # Handle would-block errors gracefully
+                        if e.errno not in (socket.EAGAIN, socket.EWOULDBLOCK):
+                            return
+                    except Exception:
                         return
-        except:
+        except Exception:
             pass
+        finally:
+            # Restore blocking mode
+            try:
+                client_sock.setblocking(True)
+            except:
+                pass
+            try:
+                server_sock.setblocking(True)
+            except:
+                pass
     
     def handle_connection(self, client_sock, server_host, server_port):
         server_sock = self.create_server_connection(server_host, server_port)

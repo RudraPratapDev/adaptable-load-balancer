@@ -33,15 +33,29 @@ class HealthMonitor:
             time.sleep(self.config['health_check_interval'])
     
     def check_server_health(self, host, port):
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(self.config['timeout'])
-            result = sock.connect_ex((host, port))
-            sock.close()
-            
-            if result == 0:
-                self.pool.mark_healthy(host, port)
-            else:
-                self.pool.mark_unhealthy(host, port)
-        except:
-            self.pool.mark_unhealthy(host, port)
+        """Check server health with retry logic to avoid false negatives"""
+        max_retries = 2
+        retry_delay = 0.5
+        
+        for attempt in range(max_retries):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(self.config['timeout'])
+                result = sock.connect_ex((host, port))
+                sock.close()
+                
+                if result == 0:
+                    self.pool.mark_healthy(host, port)
+                    return
+                
+                # If first attempt failed, wait and retry
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    
+            except Exception:
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+        
+        # Only mark unhealthy after all retries failed
+        self.pool.mark_unhealthy(host, port)

@@ -25,14 +25,17 @@ class BackendServer:
         self.running = True
         self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Increase backlog to handle more concurrent connections
+        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         
         try:
             self.server_sock.bind(('0.0.0.0', self.port))
-            self.server_sock.listen(10)
+            self.server_sock.listen(50)  # Increased from 10 to 50
             print(f"{self.name} listening on port {self.port}")
             
             while self.running:
                 try:
+                    self.server_sock.settimeout(1.0)  # Make it interruptible
                     client_sock, addr = self.server_sock.accept()
                     thread = threading.Thread(
                         target=self.handle_client,
@@ -40,6 +43,8 @@ class BackendServer:
                         daemon=True
                     )
                     thread.start()
+                except socket.timeout:
+                    continue  # Check if still running
                 except socket.error:
                     if self.running:
                         continue

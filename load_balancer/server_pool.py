@@ -29,8 +29,10 @@ class ServerPool:
         with self.lock:
             key = f"{host}:{port}"
             if key in self.servers:
-                self.servers[key]['healthy'] = False
                 self.servers[key]['failures'] += 1
+                # Only mark unhealthy after multiple consecutive failures
+                if self.servers[key]['failures'] >= 3:
+                    self.servers[key]['healthy'] = False
     
     def mark_healthy(self, host, port):
         with self.lock:
