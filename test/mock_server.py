@@ -26,7 +26,7 @@ class MockServer:
         # Performance Config
         self.base_latency_ms = random.uniform(10, 20)  # Variable base latency per server
         self.cache_hit_latency_ms = 3.0  # Fast cache hit
-        self.cache_miss_latency_ms = 100.0  # Slow DB/API fetch (more realistic)
+        self.cache_miss_latency_ms = 200.0  # Slow DB/API fetch (more realistic)
         
         # Interference (0.0 to 1.0)
         # Represents co-tenancy effects (noisy neighbors)

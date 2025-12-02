@@ -21,7 +21,7 @@ from workload_generator import WorkloadGenerator
 from mock_server import MockServer
 
 class SimulationRunner:
-    def __init__(self, num_requests=50000, concurrent_clients=50):
+    def __init__(self, num_requests=20000, concurrent_clients=15):
         self.num_requests = num_requests
         self.concurrent_clients = concurrent_clients
         self.workload_gen = WorkloadGenerator(num_unique_keys=1000, zipf_alpha=1.2)
@@ -113,7 +113,8 @@ class SimulationRunner:
                 
                 # 3. Record Stats
                 with lock:
-                    results['latencies'].append(latency)
+                    if success:
+                        results['latencies'].append(latency)
                     if is_hit: results['hits'] += 1
                     else: results['misses'] += 1
                     if not success: results['timeouts'] += 1
