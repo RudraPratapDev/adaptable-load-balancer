@@ -13,6 +13,9 @@ pytest-asyncio>=0.21.0
 # For enhanced logging and configuration
 pyyaml>=6.0
 
-# For potential future enhancements
-# numpy>=1.24.0  # Uncomment if you add statistical analysis features
-# matplotlib>=3.6.0  # Uncomment if you add plotting/graphing features
+# Research data generation and visualization
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.6.0
+seaborn>=0.12.0
+tabulate>=0.9.0
