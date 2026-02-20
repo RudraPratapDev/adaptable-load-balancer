@@ -295,3 +295,6 @@ Icon
 # Project-specific runtime files
 *.pid.lock
 *.sock.lock
+
+# PlantUML architecture diagrams
+*.puml

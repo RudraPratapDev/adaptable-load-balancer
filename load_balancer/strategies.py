@@ -378,20 +378,19 @@ class ALPHA1Strategy(Strategy):
             (1 - self.ewma_alpha) * state['work_queue_ewma']
         )
         
-        # Simulate interference signal based on connection volatility
-        # More volatile connection patterns = higher interference
+        # Calculate interference signal based on response time volatility
+        # More volatile response times = higher interference (CPU contention, noisy neighbors)
         state['request_timestamps'].append(current_time)
-        if len(state['request_timestamps']) >= 2:
-            # Calculate inter-arrival time variance as interference proxy
-            intervals = []
-            for i in range(1, len(state['request_timestamps'])):
-                intervals.append(
-                    state['request_timestamps'][i] - state['request_timestamps'][i-1]
-                )
-            if intervals:
-                avg_interval = sum(intervals) / len(intervals)
-                variance = sum((x - avg_interval) ** 2 for x in intervals) / len(intervals)
-                state['interference_signal'] = min(variance * 100, 10.0)  # Cap at 10
+        if len(state['response_times']) >= 5:
+            # Calculate response time variance as interference proxy
+            times = list(state['response_times'])
+            avg_time = sum(times) / len(times)
+            variance = sum((x - avg_time) ** 2 for x in times) / len(times)
+            # Normalize variance to 0-10 scale (variance in ms², divide by 1000 for scaling)
+            state['interference_signal'] = min(variance / 1000.0, 10.0)  # Cap at 10
+        else:
+            # Not enough response time data yet, use neutral interference
+            state['interference_signal'] = 0.0
         
         # Update head request age (time since oldest request)
         time_since_last = current_time - state['last_update']

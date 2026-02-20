@@ -280,16 +280,22 @@ class ComprehensiveEvaluator:
         return results
 
     def print_results(self, results):
-        """Print comprehensive results table"""
+        """Print comprehensive results table with separate comparisons for ALPHA1 and BETA1"""
         print(f"\n{'='*120}")
         print(f"PERFORMANCE RESULTS")
         print(f"{'='*120}\n")
         
-        # Main performance table
+        # Separate results for different comparisons
+        alpha1_comparison = [r for r in results if 'BETA1' not in r['strategy']]
+        beta1_comparison = [r for r in results if 'ALPHA1' not in r['strategy']]
+        
+        # ALPHA1 Comparison Table (excludes BETA1)
+        print(f"TABLE 1: ALPHA1 (AURA) TAIL LATENCY COMPARISON")
+        print(f"{'='*120}")
         print(f"{'Strategy':<20} {'Success%':<10} {'P50(ms)':<10} {'P95(ms)':<10} {'P99(ms)':<10} {'P99.9(ms)':<10} {'RPS':<10}")
         print(f"{'-'*120}")
         
-        for r in results:
+        for r in alpha1_comparison:
             print(f"{r['strategy']:<20} "
                   f"{r['success_rate']:<10.2f} "
                   f"{r['p50_ms']:<10.2f} "
@@ -300,13 +306,44 @@ class ComprehensiveEvaluator:
         
         print(f"\n{'='*120}\n")
         
-        # Cache and reliability table
-        print(f"CACHE & RELIABILITY METRICS")
+        # BETA1 Comparison Table (excludes ALPHA1)
+        print(f"TABLE 2: BETA1 (HELIOS) CACHE-AWARE COMPARISON")
+        print(f"{'='*120}")
+        print(f"{'Strategy':<20} {'Success%':<10} {'P50(ms)':<10} {'P95(ms)':<10} {'P99(ms)':<10} {'P99.9(ms)':<10} {'RPS':<10}")
+        print(f"{'-'*120}")
+        
+        for r in beta1_comparison:
+            print(f"{r['strategy']:<20} "
+                  f"{r['success_rate']:<10.2f} "
+                  f"{r['p50_ms']:<10.2f} "
+                  f"{r['p95_ms']:<10.2f} "
+                  f"{r['p99_ms']:<10.2f} "
+                  f"{r['p999_ms']:<10.2f} "
+                  f"{r['throughput_rps']:<10.2f}")
+        
+        print(f"\n{'='*120}\n")
+        
+        # Cache and reliability tables (separate for each comparison)
+        print(f"CACHE & RELIABILITY METRICS - ALPHA1 COMPARISON")
         print(f"{'-'*120}")
         print(f"{'Strategy':<20} {'Cache Hit%':<12} {'Hits':<8} {'Misses':<8} {'Timeouts':<10} {'Balance':<10}")
         print(f"{'-'*120}")
         
-        for r in results:
+        for r in alpha1_comparison:
+            print(f"{r['strategy']:<20} "
+                  f"{r['hit_rate']:<12.2f} "
+                  f"{r['hits']:<8} "
+                  f"{r['misses']:<8} "
+                  f"{r['timeouts']:<10} "
+                  f"{r['load_balance_stdev']:<10.2f}")
+        
+        print(f"\n{'-'*120}")
+        print(f"CACHE & RELIABILITY METRICS - BETA1 COMPARISON")
+        print(f"{'-'*120}")
+        print(f"{'Strategy':<20} {'Cache Hit%':<12} {'Hits':<8} {'Misses':<8} {'Timeouts':<10} {'Balance':<10}")
+        print(f"{'-'*120}")
+        
+        for r in beta1_comparison:
             print(f"{r['strategy']:<20} "
                   f"{r['hit_rate']:<12.2f} "
                   f"{r['hits']:<8} "
@@ -343,13 +380,39 @@ class ComprehensiveEvaluator:
         
         print(f"\n{'='*120}\n")
         
-        # Improvement analysis vs Round Robin
-        print(f"IMPROVEMENT ANALYSIS (vs Round Robin)")
+        # Improvement analysis vs Round Robin (separate for each comparison)
+        print(f"ALPHA1 IMPROVEMENT ANALYSIS (vs Round Robin)")
         print(f"{'-'*120}")
         
         rr_result = next((r for r in results if 'Round Robin' in r['strategy']), None)
         if rr_result:
-            for r in results:
+            for r in alpha1_comparison:
+                if r['strategy'] == 'Round Robin':
+                    continue
+                
+                p99_improvement = ((rr_result['p99_ms'] - r['p99_ms']) / 
+                                  max(rr_result['p99_ms'], 0.001) * 100)
+                p999_improvement = ((rr_result['p999_ms'] - r['p999_ms']) / 
+                                   max(rr_result['p999_ms'], 0.001) * 100)
+                cache_improvement = r['hit_rate'] - rr_result['hit_rate']
+                timeout_improvement = rr_result['timeouts'] - r['timeouts']
+                
+                print(f"\n{r['strategy']}:")
+                print(f"  P99 Latency:    {p99_improvement:+.1f}% "
+                      f"({r['p99_ms']:.1f}ms vs {rr_result['p99_ms']:.1f}ms)")
+                print(f"  P99.9 Latency:  {p999_improvement:+.1f}% "
+                      f"({r['p999_ms']:.1f}ms vs {rr_result['p999_ms']:.1f}ms)")
+                print(f"  Cache Hit Rate: {cache_improvement:+.1f}% "
+                      f"({r['hit_rate']:.1f}% vs {rr_result['hit_rate']:.1f}%)")
+                print(f"  Timeouts:       {timeout_improvement:+d} "
+                      f"({r['timeouts']} vs {rr_result['timeouts']})")
+        
+        print(f"\n{'-'*120}")
+        print(f"BETA1 IMPROVEMENT ANALYSIS (vs Round Robin)")
+        print(f"{'-'*120}")
+        
+        if rr_result:
+            for r in beta1_comparison:
                 if r['strategy'] == 'Round Robin':
                     continue
                 
@@ -402,6 +465,23 @@ class ComprehensiveEvaluator:
             print(f"  ✓ Rendezvous hashing provides stable key affinity")
             print(f"  ✓ Bounded-load prevents hotspots")
             print(f"  ✓ 25x faster responses on cache hits (2ms vs 50ms)")
+        
+        print(f"\n{'='*120}\n")
+        
+        # Add Final Summary Table (like the working one)
+        print(f"=== FINAL SUMMARY ===")
+        print(f"{'Strategy':<20} {'P99 (ms)':<10} {'P99.9 (ms)':<12} {'Hit Rate (%)':<15} {'RPS':<10} {'Stdev':<10} {'Fairness':<10}")
+        print("-" * 100)
+        for r in results:
+            # Calculate fairness using Jain's fairness index
+            selections = list(r['server_selections'].values())
+            if len(selections) > 1:
+                mean_sel = sum(selections) / len(selections)
+                fairness = (sum(selections) ** 2) / (len(selections) * sum(x**2 for x in selections)) if sum(x**2 for x in selections) > 0 else 1.0
+            else:
+                fairness = 1.0
+                
+            print(f"{r['strategy']:<20} {r['p99_ms']:<10.2f} {r['p999_ms']:<12.2f} {r['hit_rate']:<15.2f} {r['throughput_rps']:<10.2f} {r['load_balance_stdev']:<10.2f} {fairness:<10.4f}")
         
         print(f"\n{'='*120}\n")
 

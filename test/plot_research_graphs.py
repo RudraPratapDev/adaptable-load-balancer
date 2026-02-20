@@ -4,6 +4,8 @@ import time
 import threading
 import statistics
 import random
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend to avoid threading issues
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
